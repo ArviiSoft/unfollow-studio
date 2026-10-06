@@ -72,3 +72,4 @@ This version removes the preliminary profile lookup that prevented some scans fr
 - These changes do not bypass Instagram restrictions or guarantee that live list endpoints will accept a scan.
 
 [v1.1.3]: https://github.com/ArviiSoft/unfollow-studio/releases/tag/v1.1.3
+[v1.1.2]: https://github.com/ArviiSoft/unfollow-studio/releases/tag/v1.1.2
