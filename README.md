@@ -2,7 +2,7 @@
 
 A local Instagram follow manager that runs in your browser console. Review connections, protect accounts and confirm each unfollow queue from one panel.
 
-**Version 1.1.3** · No password collection · No external application server · No runtime dependencies
+**No password collection · No external application server · No runtime dependencies**
 
 ## Screenshots
 
