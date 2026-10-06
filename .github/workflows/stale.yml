@@ -1,0 +1,38 @@
+name: Stale issue and pull request management
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: stale
+  cancel-in-progress: false
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93
+        with:
+          days-before-stale: 14
+          days-before-close: 7
+          exempt-issue-labels: security,bug,pinned
+          exempt-pr-labels: security,pinned
+          exempt-draft-pr: true
+          operations-per-run: 30
+          stale-issue-label: stale
+          stale-pr-label: stale
+          stale-issue-message: >
+            This issue has been marked as stale due to inactivity. It will be closed in 7 days unless there is further activity.
+          stale-pr-message: >
+            This pull request has been marked as stale due to inactivity. It will be closed in 7 days unless there is further activity.
+          close-issue-message: >
+            This issue was closed due to continued inactivity. If the problem persists, you can open a new issue.
+          close-pr-message: >
+            This pull request was closed due to continued inactivity. You can reopen it if work is still in progress.

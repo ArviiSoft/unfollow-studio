@@ -1,0 +1,13 @@
+node_modules/
+*.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+exports/
+backups/
+instagram-*.json
+instagram-*.csv
