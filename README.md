@@ -102,21 +102,6 @@ GitHub Actions runs lint, bundle verification and dependency auditing on Node.js
 | `src/ui.mjs`, `src/styles.css` | Shadow DOM interface and themes |
 | `docs/screenshots/` | README screenshots |
 
-## Changes in 1.1.3
-
-- Added the screenshots and project-specific GitHub community files.
-- Removed source and generated code comments.
-- Restricted request destinations and rejected contradictory pagination metadata.
-- Hardened the local demo server against malformed targets and unexpected hosts.
-- Added ESLint, a dependency lockfile and CI checks.
-- Pinned GitHub Actions to verified commits and excluded common secrets and personal exports from Git.
-
-## Changes in 1.1.2
-
-- Removed the preliminary profile lookup and username prompt; scans use the signed-in account ID directly.
-- Added up to three retries for list requests returning HTTP 429, with 30/60/90-second waits and support for a longer `Retry-After` deadline.
-- Added a cancellable cooldown countdown while preserving the same request URL and page cursor.
-- Kept actions disabled after incomplete scans or exhausted retries, with no automatic retry of unfollow POSTs.
 
 See the [changelog](CHANGELOG.md) for the complete release history.
 
