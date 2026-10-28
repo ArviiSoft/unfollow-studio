@@ -2,7 +2,7 @@
 
 A local Instagram follow manager that runs in your browser console. Review connections, protect accounts and confirm each unfollow queue from one panel.
 
-**Version 1.1.4** · No password collection · No external application server · No runtime dependencies
+**No password collection · No external application server · No runtime dependencies**
 
 ## Screenshots
 
@@ -37,6 +37,8 @@ Every queue requires a reviewed list and explicit confirmation. Delays and queue
 7. Click **Unfollow selected**, review the exact list, tick the confirmation checkbox and start the queue.
 
 Opening the panel sends no Instagram requests. It uses the signed-in account ID; a username or profile lookup is not required. Running the same version again reopens the panel.
+
+After updating the script, refresh the Instagram tab and complete a new scan. Older snapshots may not contain profile photo URLs. If action data is unavailable, open an Instagram profile before reopening the panel.
 
 **Offline demo:** download the repository and open [demo.html](demo.html) in a browser. It uses sample accounts and accelerated delays. The code button copies the production script; if clipboard access is unavailable, copy the `.txt` file instead.
 
@@ -103,32 +105,6 @@ GitHub Actions runs lint, regression tests, bundle verification and dependency a
 | `src/storage.mjs` | Snapshot persistence |
 | `src/ui.mjs`, `src/styles.css` | Shadow DOM interface and themes |
 | `docs/screenshots/` | README screenshots |
-
-## Changes in 1.1.4
-
-- Preserved profile photo URLs from REST/GraphQL scans, saved snapshots and protection backups. Newly scanned data also refreshes protected accounts.
-- Added lazy-loaded circular photos, initials on image failure, and an embedded blue verification PNG.
-- Replaced the legacy `/web/friendships/<id>/unfollow/` request with the web `usePolarisUnfollowMutation` at `/api/graphql`. The request uses action tokens from the current page and its loaded mutation ID when available, with a compatibility ID as a fallback. This flow was cross-checked against the [InstagramUnfollowers implementation](https://github.com/davidarroyo1234/InstagramUnfollowers/blob/master/src/utils/utils.ts); Instagram may change these private interfaces.
-- Kept the pre-action relationship check, result verification and single-attempt POST behavior. HTTP errors now identify the failing operation.
-- Added regression coverage for photos, action data, confirmed and uncertain results, failed requests and protected/mutual accounts.
-
-After updating, refresh the Instagram tab, run the new script and complete a new scan. Old snapshots cannot supply photo URLs that were previously discarded. If action data is unavailable, open an Instagram profile before reopening the panel. Live compatibility still needs verification in a signed-in session.
-
-## Changes in 1.1.3
-
-- Added the screenshots and project-specific GitHub community files.
-- Removed source and generated code comments.
-- Restricted request destinations and rejected contradictory pagination metadata.
-- Hardened the local demo server against malformed targets and unexpected hosts.
-- Added ESLint, a dependency lockfile and CI checks.
-- Pinned GitHub Actions to verified commits and excluded common secrets and personal exports from Git.
-
-## Changes in 1.1.2
-
-- Removed the preliminary profile lookup and username prompt; scans use the signed-in account ID directly.
-- Added up to three retries for list requests returning HTTP 429, with 30/60/90-second waits and support for a longer `Retry-After` deadline.
-- Added a cancellable cooldown countdown while preserving the same request URL and page cursor.
-- Kept actions disabled after incomplete scans or exhausted retries, with no automatic retry of unfollow POSTs.
 
 See the [changelog](CHANGELOG.md) for the complete release history.
 
