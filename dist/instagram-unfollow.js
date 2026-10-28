@@ -181,7 +181,6 @@ class UnfollowQueue {
   }
 }
 
-
 function cookieValue(name, cookie) {
   const entry = cookie.split(';').map(s => s.trim()).find(s => s.startsWith(`${name}=`));
   if (!entry) return '';
@@ -479,7 +478,6 @@ class InstagramClient {
     if (after.following) throw new Error('Could not verify the unfollow.');
   }
 }
-
 class SnapshotStore {
   constructor(factory = globalThis.indexedDB) { this.factory = factory; this.database = null; }
   open() {
