@@ -10,6 +10,16 @@ export function settingsOf(value = {}) {
     breakSeconds: bound('breakSeconds', 120, 1800), maxItems: bound('maxItems', 1, 50) };
 }
 
+export function profilePhotoUrl(value) {
+  if (typeof value !== 'string' || value.length > 8192) return '';
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.username || url.password || url.port) return '';
+    if (!['cdninstagram.com', 'fbcdn.net', 'instagram.com'].some(domain => url.hostname === domain || url.hostname.endsWith(`.${domain}`))) return '';
+    return url.href;
+  } catch { return ''; }
+}
+
 export function normalizeUser(raw) {
   if (!raw || typeof raw !== 'object') throw new Error('Account data could not be read; the scan is incomplete.');
   const rawId = raw.id ?? raw.pk_id ?? raw.pk;
@@ -19,7 +29,8 @@ export function normalizeUser(raw) {
   if (!/^\d{1,30}$/.test(id) || !/^[a-zA-Z0-9_.]{1,30}$/.test(username)) {
     throw new Error('Unexpected account format; no action was taken with incomplete data.');
   }
-  return { id, username, full_name: String(raw.full_name ?? '').slice(0, 200),
+  const photo = [raw.profile_pic_url, raw.profile_pic_url_hd, raw.hd_profile_pic_url_info?.url].map(profilePhotoUrl).find(Boolean) ?? '';
+  return { id, username, full_name: String(raw.full_name ?? '').slice(0, 200), profile_pic_url: photo,
     is_private: raw.is_private === true, is_verified: raw.is_verified === true };
 }
 

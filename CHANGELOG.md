@@ -10,6 +10,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Fixed:** Bug fixes.
 - **Security:** Security fixes and hardening.
 
+## [v1.1.4] - 2026-10-28
+
+### Added
+
+- Added circular profile photos with lazy loading and an initials fallback for missing or expired images.
+- Added a bundled blue verification PNG that works without an external asset request.
+- Added regression tests for photo persistence, mutation requests, error handling and queue safeguards.
+
+### Fixed
+
+- Preserved validated Instagram/Meta photo URLs during account normalization, snapshot loading and protection import.
+- Refreshed protected account details from completed scans.
+- Replaced the legacy unfollow endpoint with the Instagram web GraphQL mutation and current-page action tokens.
+- Distinguished relationship-check failures from unfollow failures in HTTP error messages.
+
+### Security
+
+- Restricted image URLs to HTTPS Instagram/Meta hosts and sent them without a referrer or API headers.
+- Restricted GraphQL POSTs to the unfollow operation and retained session checks, result verification and no automatic mutation retries.
+
 ## [v1.1.3] - 2026-10-06
 
 ### Added
@@ -71,5 +91,6 @@ This version removes the preliminary profile lookup that prevented some scans fr
 - A rate limit never triggers an alternate endpoint.
 - These changes do not bypass Instagram restrictions or guarantee that live list endpoints will accept a scan.
 
+[v1.1.4]: https://github.com/ArviiSoft/unfollow-studio/releases/tag/v1.1.4
 [v1.1.3]: https://github.com/ArviiSoft/unfollow-studio/releases/tag/v1.1.3
 [v1.1.2]: https://github.com/ArviiSoft/unfollow-studio/releases/tag/v1.1.2

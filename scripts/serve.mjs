@@ -26,7 +26,7 @@ export function createDemoServer() {
     try {
       const data = await readFile(path.join(root, file[0]));
       res.writeHead(200, { 'Content-Type': file[1], 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
-        'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
         'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' });
       res.end(req.method === 'HEAD' ? undefined : data);
     } catch { res.writeHead(500); res.end('Run npm run build first.'); }

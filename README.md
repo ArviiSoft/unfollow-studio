@@ -2,7 +2,7 @@
 
 A local Instagram follow manager that runs in your browser console. Review connections, protect accounts and confirm each unfollow queue from one panel.
 
-**Version 1.1.3** · No password collection · No external application server · No runtime dependencies
+**Version 1.1.4** · No password collection · No external application server · No runtime dependencies
 
 ## Screenshots
 
@@ -48,6 +48,7 @@ Opening the panel sends no Instagram requests. It uses the signed-in account ID;
 - CSV/JSON export, username copying and comparisons between completed scans.
 - Activity history, confirmation, pause, resume, stop and batch breaks.
 - Light and dark themes.
+- Profile photos from the scan, with initials when a photo is missing or unavailable, and an embedded blue verification PNG.
 
 Only accounts that do not follow you back are eligible. The relationship is checked again before every unfollow; accounts that now follow you, are already unfollowed or have been protected are skipped. An ambiguous POST result is never automatically retried or recorded as successful.
 
@@ -62,7 +63,7 @@ A new complete scan is required after opening the panel. Scans expire after 30 m
 
 ## Privacy and limitations
 
-Live mode runs only on HTTPS `instagram.com` or `www.instagram.com`. Requests use an allowlist of relative Instagram paths, keep credentials on the same origin and refuse redirects. Passwords, session cookies and CSRF values are not saved or exported. No external fonts, analytics or code CDN are used.
+Live mode runs only on HTTPS `instagram.com` or `www.instagram.com`. API requests use an allowlist of relative Instagram paths, keep credentials on the same origin and refuse redirects. Passwords, session cookies, CSRF values and page action tokens are not saved or exported. No external fonts, analytics or code CDN are used. Profile images load directly from HTTPS Instagram/Meta image hosts without a referrer or API headers. Image URLs are retained in saved account data; expired images fall back to initials until the next scan. The verification PNG is embedded in the script and makes no network request.
 
 Snapshots are stored in the `insta-unfollow-studio` IndexedDB database. Settings, protected accounts and activity history use `insta-unfollow-studio:v2:<accountId>` in localStorage. **These records are not encrypted; other scripts on the Instagram origin can read them.** Exported files contain account information and should remain private.
 
@@ -79,6 +80,7 @@ Use **Node.js 22.13+**. Building and serving the demo use Node.js built-ins. Lin
 ```sh
 npm ci --ignore-scripts
 npm run lint
+npm test
 npm run build
 npm run build:check
 npm audit
@@ -89,7 +91,7 @@ On Windows PowerShell, use `npm.cmd` if execution policy blocks the PowerShell w
 
 `npm start` serves the demo at [127.0.0.1:4173](http://127.0.0.1:4173), bound to loopback. It serves only the demo and generated scripts. Rebuild after source edits and include the three generated files in your commit. `build:check` fails when generated files differ from the source.
 
-GitHub Actions runs lint, bundle verification and dependency auditing on Node.js 22 and 24. Dependabot checks development packages and Actions weekly.
+GitHub Actions runs lint, regression tests, bundle verification and dependency auditing on Node.js 22 and 24. Dependabot checks development packages and Actions weekly.
 
 | Path | Purpose |
 | --- | --- |
@@ -101,6 +103,16 @@ GitHub Actions runs lint, bundle verification and dependency auditing on Node.js
 | `src/storage.mjs` | Snapshot persistence |
 | `src/ui.mjs`, `src/styles.css` | Shadow DOM interface and themes |
 | `docs/screenshots/` | README screenshots |
+
+## Changes in 1.1.4
+
+- Preserved profile photo URLs from REST/GraphQL scans, saved snapshots and protection backups. Newly scanned data also refreshes protected accounts.
+- Added lazy-loaded circular photos, initials on image failure, and an embedded blue verification PNG.
+- Replaced the legacy `/web/friendships/<id>/unfollow/` request with the web `usePolarisUnfollowMutation` at `/api/graphql`. The request uses action tokens from the current page and its loaded mutation ID when available, with a compatibility ID as a fallback. This flow was cross-checked against the [InstagramUnfollowers implementation](https://github.com/davidarroyo1234/InstagramUnfollowers/blob/master/src/utils/utils.ts); Instagram may change these private interfaces.
+- Kept the pre-action relationship check, result verification and single-attempt POST behavior. HTTP errors now identify the failing operation.
+- Added regression coverage for photos, action data, confirmed and uncertain results, failed requests and protected/mutual accounts.
+
+After updating, refresh the Instagram tab, run the new script and complete a new scan. Old snapshots cannot supply photo URLs that were previously discarded. If action data is unavailable, open an Instagram profile before reopening the panel. Live compatibility still needs verification in a signed-in session.
 
 ## Changes in 1.1.3
 

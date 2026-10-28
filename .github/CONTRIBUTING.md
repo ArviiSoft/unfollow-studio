@@ -11,6 +11,7 @@ Submit bug reports and suggestions through this repository's Issues section. Che
 ```sh
 npm ci --ignore-scripts
 npm run lint
+npm test
 npm run build
 npm run build:check
 npm audit

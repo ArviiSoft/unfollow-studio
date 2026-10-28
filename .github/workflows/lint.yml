@@ -36,6 +36,8 @@ jobs:
         run: npm ci --ignore-scripts --no-fund
       - name: Lint
         run: npm run lint
+      - name: Regression tests
+        run: npm test
       - name: Verify committed bundles
         run: npm run build:check
       - name: Audit dependencies

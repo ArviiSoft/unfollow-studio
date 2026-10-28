@@ -52,9 +52,52 @@ const LIST_QUERIES = {
   following: { hash: '58712303d941c6855d4e888c5f0cd22f', edge: 'edge_follow' }
 };
 
+const UNFOLLOW_MUTATION = 'usePolarisUnfollowMutation';
+const UNFOLLOW_DOC_ID = '27789106940691111';
+
+export function webMutationContext(pageWindow = globalThis.window, pageDocument = globalThis.document) {
+  const context = { fbDtsg: '', lsd: '', docId: UNFOLLOW_DOC_ID };
+  const readModule = name => { try { return pageWindow?.require?.(name); } catch { return null; } };
+  const setToken = (key, value) => { if (typeof value === 'string' && value.length > 0 && value.length <= 4096) context[key] = value; };
+  setToken('fbDtsg', readModule('DTSGInitialData')?.token);
+  setToken('lsd', readModule('LSD')?.token);
+  const mutation = readModule(`${UNFOLLOW_MUTATION}.graphql`);
+  if (mutation?.params?.name === UNFOLLOW_MUTATION && /^\d{1,30}$/.test(mutation.params.id)) context.docId = mutation.params.id;
+  let remaining = 50000;
+  for (const script of pageDocument?.querySelectorAll('script[type="application/json"]') ?? []) {
+    if ((context.fbDtsg && context.lsd) || !remaining) break;
+    if (script.textContent.length > 5 * 1024 * 1024) continue;
+    let parsed;
+    try { parsed = JSON.parse(script.textContent); } catch { continue; }
+    const pending = [parsed];
+    while (pending.length && remaining > 0) {
+      const value = pending.pop(); remaining--;
+      if (!value || typeof value !== 'object') continue;
+      if (Array.isArray(value)) {
+        if (value[0] === 'DTSGInitialData' && !context.fbDtsg) setToken('fbDtsg', value[2]?.token);
+        if (value[0] === 'LSD' && !context.lsd) setToken('lsd', value[2]?.token);
+      }
+      for (const child of Object.values(value)) if (child && typeof child === 'object' && pending.length < remaining) pending.push(child);
+    }
+  }
+  if (!context.fbDtsg || !context.lsd) throw new InstagramError('Instagram action data is unavailable. Refresh Instagram, open a profile, then reopen the panel and scan again. No unfollow request was sent.', 'session');
+  return context;
+}
+
+function unfollowRequestBody(body, accountId) {
+  if (typeof body !== 'string') return false;
+  const params = new URLSearchParams(body);
+  try {
+    const variables = JSON.parse(params.get('variables'));
+    return params.get('fb_api_req_friendly_name') === UNFOLLOW_MUTATION && /^\d{1,30}$/.test(params.get('doc_id'))
+      && params.get('av') === accountId && typeof variables?.target_user_id === 'string'
+      && /^\d{1,30}$/.test(variables.target_user_id) && variables.target_user_id !== accountId;
+  } catch { return false; }
+}
+
 export class InstagramClient {
-  constructor({ accountId, fetcher = globalThis.fetch.bind(globalThis), cookies = () => document.cookie, pageDelay = 2500, maxPages = 1000, scanRetries = 3, wait = sleep, now = Date.now }) {
-    Object.assign(this, { accountId, fetcher, cookies, pageDelay, maxPages, scanRetries, wait, now });
+  constructor({ accountId, fetcher = globalThis.fetch.bind(globalThis), cookies = () => document.cookie, mutationContext = webMutationContext, pageDelay = 2500, maxPages = 1000, scanRetries = 3, wait = sleep, now = Date.now }) {
+    Object.assign(this, { accountId, fetcher, cookies, mutationContext, pageDelay, maxPages, scanRetries, wait, now });
     this.retryAt = 0;
   }
   assertSession() {
@@ -63,12 +106,12 @@ export class InstagramClient {
     }
     if (!cookieValue('csrftoken', this.cookies())) throw new InstagramError('Instagram session not found. Please sign in again.', 'session');
   }
-  async request(path, { signal, method = 'GET', beforeSend, operation = 'request' } = {}) {
+  async request(path, { signal, method = 'GET', body = '', beforeSend, operation = 'request' } = {}) {
     checkAbort(signal); this.assertSession();
     const allowed = typeof path === 'string' && (method === 'GET'
       ? /^\/api\/v1\/friendships\/(?:\d{1,30}\/(?:followers|following)|show\/\d{1,30})\/(?:\?[^#\\\s]*)?$/.test(path)
         || /^\/graphql\/query\/\?[^#\\\s]+$/.test(path)
-      : method === 'POST' && /^\/web\/friendships\/\d{1,30}\/unfollow\/$/.test(path));
+      : method === 'POST' && path === '/api/graphql' && unfollowRequestBody(body, this.accountId));
     if (!allowed) throw new InstagramError('Unexpected request destination or method. No request was sent.', 'destination');
     if (this.retryAt > this.now()) {
       throw new InstagramError(`Instagram requested a wait until ${new Date(this.retryAt).toLocaleString('en-US')}. No request was sent.`, 'rate_limit', { retryAt: this.retryAt });
@@ -80,10 +123,14 @@ export class InstagramClient {
     try {
       const headers = { 'X-IG-App-ID': '936619743392459', 'X-ASBD-ID': '129477', 'X-Requested-With': 'XMLHttpRequest',
         'X-CSRFToken': cookieValue('csrftoken', this.cookies()), Accept: 'application/json' };
-      if (method === 'POST') headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      if (method === 'POST') {
+        headers['Content-Type'] = 'application/x-www-form-urlencoded';
+        headers['X-FB-Friendly-Name'] = UNFOLLOW_MUTATION;
+        headers['X-FB-LSD'] = new URLSearchParams(body).get('lsd');
+      }
       beforeSend?.();
       const response = await this.fetcher(path, { method, credentials: 'same-origin', redirect: 'error', cache: 'no-store',
-        headers, signal: timer.signal, ...(method === 'POST' ? { body: '' } : {}) });
+        headers, signal: timer.signal, ...(method === 'POST' ? { body } : {}) });
       if (response.status === 429) {
         const retryAt = retryAfterTime(response.headers?.get('Retry-After'), this.now());
         this.retryAt = retryAt ?? 0;
@@ -94,10 +141,10 @@ export class InstagramClient {
         throw new InstagramError(`Instagram limited the ${operation} (HTTP 429). ${reason ? `Server message: ${reason} ` : ''}${waitMessage} Request stopped.`, 'rate_limit', { status: 429, operation, retryAt, reason, retryable: !requiresVerification(body) });
       }
       if (response.status === 401 || response.status === 403) throw new InstagramError('Instagram denied access. Check your session and any notice on Instagram.', 'session');
-      if (!response.ok) throw new InstagramError(`Instagram returned HTTP ${response.status}. The operation was stopped.`, 'http', { status: response.status });
+      if (!response.ok) throw new InstagramError(`Instagram returned HTTP ${response.status} during the ${operation}. ${response.status === 404 ? 'The account or request endpoint is unavailable. ' : ''}The operation was stopped.`, 'http', { status: response.status, operation });
       let data;
-      try { data = await response.json(); } catch { throw new InstagramError('Instagram returned an unexpected response. Check your session.', 'response'); }
-      if (!data || typeof data !== 'object' || data.status === 'fail' || requiresVerification(data)) {
+      try { data = JSON.parse((await response.text()).replace(/^for \(;;\);\s*/, '')); } catch { throw new InstagramError(`Instagram returned an unexpected response during the ${operation}. Check your session.`, 'response'); }
+      if (!data || typeof data !== 'object' || data.status === 'fail' || data.error || data.errors?.length || requiresVerification(data)) {
         throw new InstagramError('Instagram rejected the request or requires verification. Stopped; check Instagram before continuing.', 'blocked');
       }
       this.assertSession(); return data;
@@ -232,11 +279,20 @@ export class InstagramClient {
     return relationship;
   }
   async unfollow(id, signal, beforeSend) {
-    if (!/^\d+$/.test(id) || id === this.accountId) throw new Error('Invalid target account.');
-    const data = await this.request(`/web/friendships/${id}/unfollow/`, { method: 'POST', signal, beforeSend, operation: 'unfollow request' });
-    if (data.status !== 'ok') throw new Error('Could not verify the result.');
-    if (data.friendship_status?.following === false) return;
-    if (data.friendship_status?.following === true) throw new Error('The account is still followed.');
+    if (typeof id !== 'string' || !/^\d{1,30}$/.test(id) || id === this.accountId) throw new Error('Invalid target account.');
+    checkAbort(signal); this.assertSession();
+    const { fbDtsg, lsd, docId } = this.mutationContext();
+    const checksum = [...fbDtsg].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const body = new URLSearchParams({ av: this.accountId, __d: 'www', __user: '0', __a: '1', __comet_req: '7',
+      fb_dtsg: fbDtsg, jazoest: `2${checksum}`, lsd, fb_api_caller_class: 'RelayModern',
+      fb_api_req_friendly_name: UNFOLLOW_MUTATION, doc_id: docId, server_timestamps: 'true',
+      variables: JSON.stringify({ target_user_id: id, container_module: 'profile', nav_chain: 'PolarisProfilePostsTabRoot:profilePage:1:via_cold_start' }) }).toString();
+    const data = await this.request('/api/graphql', { method: 'POST', body, signal, beforeSend, operation: 'unfollow request' });
+    if (!data.data || typeof data.data !== 'object' || !Object.keys(data.data).length) throw new Error('Could not verify the result.');
+    const result = data.data.xdt_api__v1__friendships__destroy;
+    if (result?.status === 'fail' || requiresVerification(result)) throw new Error('Instagram rejected the unfollow. Check Instagram before continuing.');
+    if (result?.friendship_status?.following === true || result?.friendship_status?.outgoing_request === true) throw new Error('The account is still followed or has a pending follow request.');
+    if (result?.friendship_status?.following === false) return;
     const after = await this.relation(id, signal);
     if (after.following) throw new Error('Could not verify the unfollow.');
   }

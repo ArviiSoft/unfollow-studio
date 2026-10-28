@@ -1,4 +1,4 @@
-import { classify, filterUsers, searchKey, csvOf, difference, settingsOf, DEFAULT_SETTINGS, FRESH_MS, validateSnapshot, parseProtected, uniqueUsers, UnfollowQueue } from './core.mjs';
+import { classify, filterUsers, searchKey, csvOf, difference, settingsOf, DEFAULT_SETTINGS, FRESH_MS, validateSnapshot, parseProtected, uniqueUsers, profilePhotoUrl, UnfollowQueue } from './core.mjs';
 import { InstagramClient, cookieValue, pageAccountUsername } from './instagram.mjs';
 import { createDemoClient } from './demo.mjs';
 import { SnapshotStore } from './storage.mjs';
@@ -45,11 +45,11 @@ const tabs = {
   history: ['Activity history', 'clock', 'The last 500 actions saved in this browser.']
 };
 
-export function startApp({ css, demo = false }) {
+export function startApp({ css, verifiedBadge, demo = false }) {
   const key = '__instaUnfollowStudioV1';
   if (window[key]) {
     window[key].show();
-    if (window[key].version !== '1.1.3') alert('An older panel is still open. Stop its queue, close it, and run the new script again.');
+    if (window[key].version !== '1.1.4') alert('An older panel is still open. Stop its queue, close it, and run the new script again.');
     return;
   }
   if (!demo && (location.protocol !== 'https:' || !['www.instagram.com', 'instagram.com'].includes(location.hostname))) {
@@ -99,7 +99,7 @@ export function startApp({ css, demo = false }) {
       <aside class="sidebar"><div class="brand"><span class="brand-symbol">${icon('leaf')}</span><span class="brand-text">unfollow<small>STUDIO</small></span></div>
         <div class="nav-caption">YOUR CONNECTIONS</div><nav aria-label="Account lists">${Object.entries(tabs).map(([id, [label, symbol]]) => `<button type="button" data-tab="${id}" title="${label}">${icon(symbol)}<span class="nav-label">${label}</span><span class="nav-count" data-count="${id}">0</span></button>`).join('')}</nav>
         <div class="sidebar-bottom"><nav>${[['settings', 'Settings', 'settings'], ['help', 'How it works', 'help']].map(([action, label, symbol]) => `<button type="button" data-action="${action}" title="${label}">${icon(symbol)}<span class="nav-label">${label}</span></button>`).join('')}</nav>
-          <div class="local-card">${icon('lock')}<strong>Your data stays with you.</strong><p>No passwords. No external servers. Uses your existing Instagram session.</p></div><div class="version"><span>UNFOLLOW STUDIO</span><span>v1.1.3</span></div></div>
+          <div class="local-card">${icon('lock')}<strong>Your data stays with you.</strong><p>No passwords. No external servers. Uses your existing Instagram session.</p></div><div class="version"><span>UNFOLLOW STUDIO</span><span>v1.1.4</span></div></div>
       </aside>
       <div class="workspace"><header class="topbar"><div class="breadcrumb"><span>Workspace</span><span>/</span><strong>Follow management</strong></div><div class="top-actions">${demo ? '<span class="badge demo-badge">DEMO</span>' : ''}<span class="account"><span class="status-dot"></span><span id="account-name">${demo ? '@demo.account' : 'Loading account…'}</span></span>${demo ? iconButton('copy-code', 'Copy the Instagram script', 'code') : ''}${iconButton('theme', 'Toggle theme', 'moon')}${iconButton('minimize', 'Minimize panel', 'small')}${iconButton('close', 'Close panel', 'close')}</div></header>
         <main class="content"><section class="page-heading"><div><div class="eyebrow">LESS NOISE. MORE YOU.</div><h1>Curate your connections.</h1><p class="subheading">See your connections. Curate your feed. Stay in control.</p></div><div class="heading-actions">${button('export', 'Export', 'download')}${button('scan', 'Scan my account', 'refresh', 'primary', 'id="scan-button"')}</div></section>
@@ -151,6 +151,13 @@ export function startApp({ css, demo = false }) {
       mutualIds = new Set(cachedGroups.mutual.map(u => u.id));
     }
     return cachedGroups;
+  }
+  function refreshProtectedProfiles() {
+    if (!state.snapshot || !state.protected.size) return;
+    for (const users of [state.snapshot.followers, state.snapshot.following]) {
+      for (const user of users) if (state.protected.has(user.id)) state.protected.set(user.id, user);
+    }
+    state.protectedVersion++;
   }
   function eligible(user) { groups(); return !!isFresh() && !state.protected.has(user.id) && nonfollowerIds.has(user.id); }
   function usersForTab() {
@@ -208,7 +215,7 @@ export function startApp({ css, demo = false }) {
       $('#table-area').innerHTML = `<div class="table-scroll"><table><thead><tr><th>ACCOUNT</th><th>RESULT</th><th>DETAILS</th><th>DATE</th></tr></thead><tbody>${page.map(u => `<tr><td>@${esc(u.username)}</td><td><span class="tag ${u.status === 'success' ? 'green' : 'amber'}">${labels[u.status] ?? 'Unknown'}</span></td><td class="history-message">${esc(u.message)}</td><td>${esc(date(u.at))}</td></tr>`).join('')}</tbody></table></div>`;
     } else {
       const colors = ['#e7eada', '#dfebf1', '#f1e4db', '#e7e1ef', '#dcece3', '#efe9d7'];
-      $('#table-area').innerHTML = `<div class="table-scroll"><table><thead><tr><th><input type="checkbox" id="select-page" aria-label="Select eligible accounts on this page" ${state.busy || !isFresh() ? 'disabled' : ''}></th><th>ACCOUNT</th><th class="relation-column">RELATIONSHIP</th><th class="type-column">ACCOUNT TYPE</th><th>ACTIONS</th></tr></thead><tbody>${page.map(u => `<tr class="${state.selected.has(u.id) ? 'selected' : ''}"><td><input type="checkbox" data-select="${u.id}" aria-label="${esc(u.username)} select account" ${state.selected.has(u.id) ? 'checked' : ''} ${state.busy || !eligible(u) ? 'disabled' : ''}></td><td><div class="user"><span class="avatar" style="--avatar-bg:${colors[Number(u.id.slice(-2)) % colors.length]}">${esc((u.full_name || u.username).split(/[ ._]+/).slice(0, 2).map(s => s[0]).join('').toUpperCase())}</span><div><a href="https://www.instagram.com/${encodeURIComponent(u.username)}/" target="_blank" rel="noopener noreferrer"><strong>${esc(u.username)}${u.is_verified ? '<span class="verified">' + icon('check') + '</span>' : ''}</strong></a><small>${esc(u.full_name)}</small></div></div></td><td class="relation-column">${relationTag(u)}</td><td class="type-column"><span class="tag">${u.is_private ? icon('lock') + ' Private' : 'Public'}</span></td><td><div class="row-actions"><button class="icon-btn ${state.protected.has(u.id) ? 'protected' : ''}" data-protect="${u.id}" title="${state.protected.has(u.id) ? 'Remove protection' : 'Protect account'}" aria-label="${esc(u.username)}: ${state.protected.has(u.id) ? 'remove protection' : 'protect account'}" ${state.busy ? 'disabled' : ''}>${icon('shield')}</button><a class="icon-btn" href="https://www.instagram.com/${encodeURIComponent(u.username)}/" target="_blank" rel="noopener noreferrer" title="Open profile" aria-label="${esc(u.username)} open profile">${icon('external')}</a></div></td></tr>`).join('')}</tbody></table></div>`;
+      $('#table-area').innerHTML = `<div class="table-scroll"><table><thead><tr><th><input type="checkbox" id="select-page" aria-label="Select eligible accounts on this page" ${state.busy || !isFresh() ? 'disabled' : ''}></th><th>ACCOUNT</th><th class="relation-column">RELATIONSHIP</th><th class="type-column">ACCOUNT TYPE</th><th>ACTIONS</th></tr></thead><tbody>${page.map(u => `<tr class="${state.selected.has(u.id) ? 'selected' : ''}"><td><input type="checkbox" data-select="${u.id}" aria-label="${esc(u.username)} select account" ${state.selected.has(u.id) ? 'checked' : ''} ${state.busy || !eligible(u) ? 'disabled' : ''}></td><td><div class="user"><span class="avatar" aria-hidden="true" style="--avatar-bg:${colors[Number(u.id.slice(-2)) % colors.length]}"><span>${esc((u.full_name || u.username).trim().split(/[ ._]+/).slice(0, 2).map(s => s[0]).join('').toUpperCase())}</span>${profilePhotoUrl(u.profile_pic_url) ? `<img class="avatar-photo" src="${esc(profilePhotoUrl(u.profile_pic_url))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="36" height="36">` : ''}</span><div><a href="https://www.instagram.com/${encodeURIComponent(u.username)}/" target="_blank" rel="noopener noreferrer"><strong>${esc(u.username)}${u.is_verified ? `<img class="verified" src="${esc(verifiedBadge)}" alt="Verified account" title="Verified account" width="16" height="16">` : ''}</strong></a><small>${esc(u.full_name)}</small></div></div></td><td class="relation-column">${relationTag(u)}</td><td class="type-column"><span class="tag">${u.is_private ? icon('lock') + ' Private' : 'Public'}</span></td><td><div class="row-actions"><button class="icon-btn ${state.protected.has(u.id) ? 'protected' : ''}" data-protect="${u.id}" title="${state.protected.has(u.id) ? 'Remove protection' : 'Protect account'}" aria-label="${esc(u.username)}: ${state.protected.has(u.id) ? 'remove protection' : 'protect account'}" ${state.busy ? 'disabled' : ''}>${icon('shield')}</button><a class="icon-btn" href="https://www.instagram.com/${encodeURIComponent(u.username)}/" target="_blank" rel="noopener noreferrer" title="Open profile" aria-label="${esc(u.username)} open profile">${icon('external')}</a></div></td></tr>`).join('')}</tbody></table></div>`;
       const selectable = page.filter(eligible), checked = selectable.filter(u => state.selected.has(u.id)).length;
       $('#select-page').checked = selectable.length > 0 && checked === selectable.length;
       $('#select-page').indeterminate = checked > 0 && checked < selectable.length;
@@ -271,6 +278,7 @@ export function startApp({ css, demo = false }) {
         if (closed) return;
         if (!next.profile && state.profile) next.profile = state.profile;
         state.previous = state.snapshot; state.snapshot = next; state.fresh = true; state.page = 1; state.removedIds.clear();
+        refreshProtectedProfiles();
         if (next.profile) { state.profile = next.profile; renderProfile(); }
         try { await snapshotStore.write(accountId, { snapshot: next, previous: state.previous }); }
         catch { toast('The scan could not be saved locally. Export it before closing the panel.', true); }
@@ -372,6 +380,9 @@ export function startApp({ css, demo = false }) {
     'copy-code': async () => { await navigator.clipboard.writeText(document.querySelector('#production-code')?.textContent ?? ''); toast('Script copied. Run it in the console on Instagram.'); },
     minimize, close
   };
+  shadow.addEventListener('error', event => {
+    if (event.target.matches?.('img.avatar-photo')) event.target.remove();
+  }, true);
   shadow.addEventListener('click', async event => {
     const target = event.target.closest('button, a'); if (!target || target.disabled) return;
     try {
@@ -439,6 +450,7 @@ export function startApp({ css, demo = false }) {
       } else if (state.snapshot) {
         await snapshotStore.write(accountId, { snapshot: state.snapshot, previous: state.previous });
       }
+      refreshProtectedProfiles();
       persistenceReady = true;
       save();
     } catch { storageIssue = true; persistenceReady = true; }
@@ -451,7 +463,7 @@ export function startApp({ css, demo = false }) {
     render();
     if (!closed && storageIssue) toast('Some saved data could not be loaded. Export your protection list as a backup.', true);
   }
-  window[key] = { show, version: '1.1.3' };
+  window[key] = { show, version: '1.1.4' };
   render();
   void initialize();
   if (storageIssue) toast('Some saved data could not be read. Import your protection backup if needed.', true);
