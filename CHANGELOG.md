@@ -16,7 +16,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Added circular profile photos with lazy loading and an initials fallback for missing or expired images.
 - Added a bundled blue verification PNG that works without an external asset request.
-- Added regression tests for photo persistence, mutation requests, error handling and queue safeguards.
 
 ### Fixed
 
